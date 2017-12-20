@@ -24,8 +24,8 @@ def plot_streamlines(ax, u, v, psi, xlim=(-1, 1), ylim=(-1, 1)):
     x0, x1 = xlim
     y0, y1 = ylim
     #Y, X =  np.ogrid[y0:y1:100j, x0:x1:100j]
-    X, Y = np.meshgrid(np.linspace(-downstream * 1.5 * BOUNDS, BOUNDS, 100), np.linspace(-1 * BOUNDS, BOUNDS, 100))
-    ax.streamplot(X, Y, u(X, Y), v(X, Y), color='cornflowerblue')
+    X, Y = np.meshgrid(np.linspace(-1 * downstream * BOUNDS,  BOUNDS, 100), np.linspace(-1 * BOUNDS, BOUNDS, 100))
+    ax.streamplot(X, Y, -1 * u(X, Y), v(X, Y), color='cornflowerblue', density=2, arrowsize=2)
 
 psi = stream_function()
 u, v = velocity_field(psi)

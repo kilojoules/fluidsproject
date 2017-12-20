@@ -26,17 +26,40 @@ def uwake(x, y, tx, ty):
     return u0 - udef
 X, Y = np.meshgrid(x, y)
 uwake = np.vectorize(uwake, excluded=(2,3,))
-def power(u): return a * rho * .5 * u ** 3 * np.pi * D ** 2 / 4
+def power(u): return 4 * a * (1 - a) ** 2  * rho * .5 * u ** 3 * np.pi * D ** 2 / 4
 plt.contourf(X, Y, uwake(x, np.atleast_2d(y).T, tx, ty), 100)
-c = plt.scatter(tx, ty, c = power(uwake(tx,ty, tx, ty)) / 1e6, cmap=plt.cm.coolwarm)
-plt.colorbar(c)
-plt.show()
+plt.colorbar()
+plt.scatter(tx, ty, c = power(uwake(tx,ty, tx, ty)) / 1e6, cmap=plt.cm.coolwarm)
+plt.title("Power = %f MW" % ( np.sum(power(uwake(tx,ty, tx, ty)))/1e6))
+plt.savefig('grid.pdf')
+plt.clf()
+
+tx = 500 + 500 * np.sin(np.linspace(0, 2 * np.pi, 20))
+ty = 500 + 500 * np.cos(np.linspace(0, 2 * np.pi, 20))
+plt.contourf(X, Y, uwake(x, np.atleast_2d(y).T, tx, ty), 100)
+plt.colorbar()
+plt.scatter(tx, ty, c = power(uwake(tx,ty, tx, ty)) / 1e6, cmap=plt.cm.coolwarm)
+plt.title("Power = %f MW" % ( np.sum(power(uwake(tx,ty, tx, ty)))/1e6))
+plt.savefig('circle.pdf')
+plt.clf()
+
+tx[:] = 0
+tx[10:] = 1000
+ty[:10] = np.linspace(0, 1e3, 10)
+ty[10:] = np.linspace(0, 1e3, 10)
+plt.contourf(X, Y, uwake(x, np.atleast_2d(y).T, tx, ty), 100)
+plt.colorbar()
+plt.scatter(tx, ty, c = power(uwake(tx,ty, tx, ty)) / 1e6, cmap=plt.cm.coolwarm)
+plt.title("Power = %f MW" % ( np.sum(power(uwake(tx,ty, tx, ty)))/1e6))
+plt.savefig('edges.pdf')
+plt.clf()
 
 from scipy.optimize import minimize as mini
 def fitness(x):
     ttx = x[:nturbs]
     tty = x[nturbs:]
-    return -1 * np.sum(power(uwake(ttx, tty, ttx, tty))) + spacing(x) + 1e4 * bounds(x)
+    powa =  np.sum(power(uwake(ttx, tty, ttx, tty))) / 1e6
+    return -1 * powa + spacing(x) + 1e4 * bounds(x)
 def spacing(x):
     xp = x[:nturbs]
     yp = x[nturbs:]
@@ -53,6 +76,8 @@ def bounds(x):
       if e > 1e3: penalty -= 10 * (1e3-e)
    return 1 * penalty
 x0 = np.concatenate((tx, ty))
+#s = np.array(list(tx) + list(ty))
+#print bounds(s), spacing(s) ; quit()
 
 confs = []
 for i in range(nturbs):
@@ -63,8 +88,10 @@ for i in range(nturbs):
 cons = tuple([{'type': 'ineq', 'fun': confs[i]} for i in range(len(confs))])
 #cons = cons + ({'type': 'ineq', 'fun': bounds},)
 ii = 0
+best = 0
 while True:
-   xopt = mini(fitness, x0, bounds=[[0, 1e3] for _ in range(2 * nturbs)], constraints =cons, method="COBYLA", options={'rhobeg':400}).x
+   miniout = mini(fitness, x0, bounds=[[0, 1e3] for _ in range(2 * nturbs)], constraints =cons, method="COBYLA", options={'rhobeg':400})
+   xopt = miniout.x
    #xopt = mini(fitness, x0, bounds=[[0, 1e3] for _ in range(2 * nturbs)], constraints =cons, method="COBYLA", options={'maxiter':200000}).x
    #xopt = mini(fitness, x0, bounds=[[0, 1e3] for _ in range(2 * nturbs)], constraints =cons, method="SLSQP", options={'maxiter':200000}).x
    #xopt = mini(fitness, x0, bounds=[[0, 1e3] for _ in range(2 * nturbs)], constraints = ({'type': 'eq', 'fun': spacing}), method="SLSQP", options={'maxiter':200000}).x
@@ -79,17 +106,29 @@ while True:
 #   plt.colorbar(c)
 #   plt.title('Power %f'%fitness(xopt))
 #   plt.show()
-   if abs(bounds(xopt)) < 5 and abs(spacing(xopt)) < 1: break
+   if abs(bounds(xopt)) < 5 and abs(spacing(xopt)) < 1: 
+       if  miniout.fun < best: 
+          best = miniout.fun
+          bestx = xopt
+          ii += 1
+       if ii == 10: break
+       print ii, ' / 10     <<<<----'
+       print 'BEST IS ', best
    if spacing(xopt) < spacing(x0): 
       x0 = xopt
    else: 
       x0 = np.random.uniform(0, 1e3, nturbs * 2)
+xopt = bestx
 txopt = xopt[:nturbs]
 tyopt = xopt[nturbs:]
 
 plt.contourf(X, Y, uwake(x, np.atleast_2d(y).T, txopt, tyopt), 100)
-c = plt.scatter(txopt, tyopt, c = power(uwake(tx,ty, tyopt, tyopt)) / 1e6, cmap=plt.cm.coolwarm)
-plt.colorbar(c)
-plt.title('Power %f'%fitness(xopt))
-plt.show()
+c = plt.colorbar()
+c.set_label('Wind Speed (m/s)')
+plt.scatter(txopt, tyopt, c = power(uwake(tx,ty, tyopt, tyopt)) / 1e6, cmap=plt.cm.coolwarm)
+plt.title("Power = %f MW" % ( np.sum(power(uwake(txopt, tyopt, txopt, tyopt)))/1e6))
+plt.savefig('optlayout.pdf')
+plt.clf()
+quit()
+
 plt.scatter(txopt, tyopt) ; plt.show()
